@@ -5,6 +5,9 @@ import checkers
 import checkers_Nnet as Nnet
 import pickle
 from tqdm import tqdm
+import torch
+import time
+from torch.utils.data import Dataset
 
 # Exploration constant c is defined as C_input
 C_input = 1
@@ -152,19 +155,19 @@ def MCTS_Search(board, player, num_reads, n_net):
     for i in range(num_reads):
         leaf = root.select_leaf()
         player = checkers.switch_player(player)
-        child_prior_prob, value = n_net(checkers.get_state2(leaf.board, leaf.player))
+        child_prior_prob, value = n_net(torch.FloatTensor(checkers.get_state2(leaf.board, leaf.player)))
         # print(child_prior_prob)
         # print("The number of reads", i)
         if checkers.isTerminal(board) or checkers.get_all_moves(leaf.board, leaf.player) == []:
-            print("Finished Game")
+            # print("Finished Game")
             leaf.backpropagate(value)
-            leaf.print_tree()
+            # leaf.print_tree()
         else:
             child_prior_prob = child_prior_prob.cpu().detach().numpy().reshape(-1)
             leaf.expand_and_evaluate(child_prior_prob)
             leaf.backpropagate(value)
 
-    root.print_tree()
+    # root.print_tree()
     return root
 
 
@@ -172,7 +175,8 @@ def get_policy(node, temp=1):
     return (node.child_number_visits**(1/temp))/sum(node.child_number_visits**(1/temp))
 
 
-def MCTS_self_play(nnet, num_games, s_index, iteration ):
+def MCTS_self_play(nnet, num_games, s_index, iteration):
+    data_x = []
     for itt in tqdm(range(s_index, num_games + s_index)):
         board = checkers.initial_board(board_size, board_size)
         player = 1
@@ -180,10 +184,12 @@ def MCTS_self_play(nnet, num_games, s_index, iteration ):
         value = 0
         num_moves = 0
         t = 1
-        while checkers.isTerminal(board):
+        while checkers.isTerminal(board) is not True:
             if num_moves > 15:
                 t = 0.1
-            root = MCTS_Search(board, player, 500, nnet)
+            root = MCTS_Search(board, player, 200, nnet)
+            # print("The turn of player {:d} and Moves {:d}".format(player, num_moves))
+            # checkers.print_board(root.board)
             policy = get_policy(root, t)
             data.append([board, player, policy])
             move = np.argmax(policy)
@@ -192,32 +198,64 @@ def MCTS_self_play(nnet, num_games, s_index, iteration ):
             player = checkers.switch_player(player)
             if len(checkers.get_all_moves(board, player)) == 0:
                 # Player == 1 means White pieces
+                print("Game Finished")
                 if player == 1:
                     value = 1
                 elif player == 2:
                     value = -1
                 else:
                     value = 0
+                break
             if num_moves == 150:
                 value = 0
                 break
             num_moves += 1
-        data_x = []
-        for ind, d in enumerate(data):
-            s, pl, po = d
+
+        for ind, dx in enumerate(data):
+            s, pl, po = dx
             if ind == 0:
-                data_x.append([s, pl, po, 0])
+                data_x.append([checkers.get_state2(s, pl), po, 0])
             else:
-                data_x.append([s, pl, po, value])
+                data_x.append([checkers.get_state2(s, pl), po, value])
         del data
-        filename = "MCTS_iteration-{:d}_game-{:d}.p".format(iteration, itt)
-        save_data(filename, data_x)
-    return
+        # filename = "MCTS_iteration-{:d}_game-{:d}.p".format(iteration, itt)
+        # save_data(filename, data_x)
+    return data_x
 
 
-def MCTS_run():
-    
-    return
+def training(n_net, batch_size, n_epochs, learning_rate, dataset, iteration):
+    n_net.train()
+    criteria = Nnet.ErrorFnc()
+    train_set = TrainingData(dataset)
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=0)
+    optimizer = torch.optim.Adam(n_net.parameters(), lr=learning_rate, betas=(0.8, 0.999))
+    t_time = time.time()
+
+    for epoch in range(n_epochs):
+        running_loss = 0
+        total_loss = 0
+        start_time = time.time()
+
+        for i, data in enumerate(train_loader, 0):
+            state, policy, value = data
+
+            policy_estimate, value_estimate = n_net(state.float())
+            loss = criteria(value.float(), value_estimate, policy.float(), policy_estimate)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+
+            running_loss += loss.item()
+            total_loss += loss.item()
+
+            # if i % 10 == 0:
+            #     print("Epoch-{:d}_training_loss-{:.2f}_took-{:.2f}s".format(epoch+1,
+            #                                                                 running_loss, time.time() - start_time))
+            #     start_time = time.time()
+            #     running_loss = 0
+
+        print("Training Finished, iteration-{:d} total loss-{:.2f} and took-{:.2f}s".format(iteration, total_loss, time.time() - t_time))
+
 
 def save_data(name, data):
     data1 = open(name, 'wb')
@@ -231,23 +269,39 @@ def load_data(name):
     return pickle.load(data1)
 
 
-board_n = checkers.initial_board(8, 8)
-player_n = 1
-possible_moves_n = checkers.get_all_moves(board_n, player_n)
-print(possible_moves_n)
-a = Node(board_n, possible_moves_n, player_n, ParentRootNode())
+class TrainingData(Dataset):
+    def __init__(self, data_set):
+        d = np.array(data_set)
+        self.a = d[:, 0]
+        self.b = d[:, 1]
+        self.c = d[:, 2]
+
+    def __len__(self):
+        return len(self.a)
+
+    def __getitem__(self, i):
+        return np.int64(self.a[i]), self.b[i], self.c[i]
+
+# board_n = checkers.initial_board(8, 8)
+# player_n = 1
+# possible_moves_n = checkers.get_all_moves(board_n, player_n)
+# print(possible_moves_n)
+# a = Node(board_n, possible_moves_n, player_n, ParentRootNode())
+# MCTS_Search(board_n, player_n, 2000, Nnet.Net())
 
 
-MCTS_Search(board_n, player_n, 2000, Nnet.Net())
+# d = MCTS_self_play(Nnet.Net(), 1, 0, 1)
+# training(Nnet.Net(), 1, 50, 0.001, d)
+
+def evaluate(n_net, n_games):
+    iteration = 10
+    s_index = 0
+    for i in range(iteration):
+        data = MCTS_self_play(n_net.Net(), n_games, 0, 1)
+        training(n_net.Net(), 1, 50, 0.001, data, i)
 
 
-
-
-
-
-
-
-
+evaluate(Nnet, 1)
 
 
 

@@ -20,14 +20,14 @@ We play on the black squares
 
 def make_king(board,space):
     (i,j) = space
-    print(i)
-    print(j)
-    print( board[i,j] )
+    # print(i)
+    # print(j)
+    # print( board[i,j] )
 
     if not (1<=board[i,j]<=4):   # if the space doesn't hold one of the 4 piece types
         raise ValueError("make_king() function was applied to invalid piece type")
         
-    #lambda z: [3,4,3,4][z-1]     
+    #lambda z: [3,4,3,4][z-1]
 
     newboard = np.copy(board)
 
@@ -444,7 +444,7 @@ def apply_move(board, space, move, player):     #test
     (i,j) = destination
     imax = board.shape[0]-1
     if( (player==1 and i==0) or (player==2 and i==imax) ):
-        make_king( newboard,(i,j) )
+        newboard = make_king( newboard,(i,j) )
     
     return newboard
 
@@ -461,18 +461,18 @@ def gameloop(nrows,ncols):
 
     player = 1   #used to tell whose turn it is 
     board = initial_board(nrows,ncols)
-    board = np.array([[-1,1,-1,1,-1,1,-1,1,-1,0,-1,1],
-                      [1,-1,1,-1,1,-1,1,-1,1,-1,2,-1],
-                      [-1,1,-1,1,-1,1,-1,0,-1,1,-1,0],
-                      [0,-1,0,-1,0,-1,0,-1,0,-1,0,-1],
-                      [-1,0,-1,0,-1,0,-1,0,-1,0,-1,0],
-                      [0,-1,0,-1,1,-1,0,-1,1,-1,0,-1],
-                      [-1,0,-1,2,-1,0,-1,2,-1,0,-1,0],
-                      [0,-1,0,-1,0,-1,0,-1,0,-1,0,-1],
-                      [-1,0,-1,0,-1,0,-1,0,-1,0,-1,0],
-                      [0,-1,2,-1,2,-1,2,-1,2,-1,0,-1],
-                      [-1,2,-1,2,-1,2,-1,2,-1,2,-1,2],
-                      [2,-1,2,-1,2,-1,2,-1,2,-1,2,-1]])
+    # board = np.array([[-1,1,-1,1,-1,1,-1,1,-1,0,-1,1],
+    #                   [1,-1,1,-1,1,-1,1,-1,1,-1,2,-1],
+    #                   [-1,1,-1,1,-1,1,-1,0,-1,1,-1,0],
+    #                   [0,-1,0,-1,0,-1,0,-1,0,-1,0,-1],
+    #                   [-1,0,-1,0,-1,0,-1,0,-1,0,-1,0],
+    #                   [0,-1,0,-1,1,-1,0,-1,1,-1,0,-1],
+    #                   [-1,0,-1,2,-1,0,-1,2,-1,0,-1,0],
+    #                   [0,-1,0,-1,0,-1,0,-1,0,-1,0,-1],
+    #                   [-1,0,-1,0,-1,0,-1,0,-1,0,-1,0],
+    #                   [0,-1,2,-1,2,-1,2,-1,2,-1,0,-1],
+    #                   [-1,2,-1,2,-1,2,-1,2,-1,2,-1,2],
+    #                   [2,-1,2,-1,2,-1,2,-1,2,-1,2,-1]])
                       
                       
     print_board(board)
@@ -533,7 +533,7 @@ def gameloop(nrows,ncols):
 if __name__ == "__main__":
 
 
-    gameloop(12,12)
+    gameloop(8,8)
 
 
     

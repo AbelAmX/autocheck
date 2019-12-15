@@ -20,7 +20,7 @@ class Net(nn.Module):
         self.fc = nn.Linear(Layer1, 1)
 
     def forward(self, x):
-        x = torch.FloatTensor(x)
+        # x = torch.FloatTensor(x)
         x = x.view(-1, 5, m_size, int(m_size/2))
         x = self.conv1(x)
         x = nn.functional.relu(x)
